@@ -112,23 +112,39 @@ async function autofillEntry(){
 
   try{
     const dictRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`)
+    let defs = []
     if(dictRes.ok){
       const data = await dictRes.json()
       if(Array.isArray(data) && data.length > 0){
         const entry = data[0]
-        const meaning = entry.meanings?.find(m => m.definitions?.length) || {}
-        const definition = meaning.definitions?.[0] || {}
-        partInp.value = meaning.partOfSpeech || ''
-        exampleInp.value = definition.example || ''
+        // 收集所有詞性
+        const parts = Array.from(new Set((entry.meanings||[]).map(m=>m.partOfSpeech).filter(Boolean)))
+        if(parts.length) partInp.value = parts.join(', ')
+
+        // 收集例句與定義，若有多個以 / 分隔
+        const examples = []
+        defs = []
+        for(const m of (entry.meanings||[])){
+          for(const d of (m.definitions||[])){
+            if(d.example) examples.push(d.example)
+            if(d.definition) defs.push(d.definition)
+          }
+        }
+        if(examples.length) exampleInp.value = examples.slice(0,3).join(' / ')
+        else if(defs.length) exampleInp.value = defs[0]
+
+        // 字根/出處
         etyInp.value = entry.origin || ''
-        showAlert('已從字典抓取可用資料', 'success')
+        showAlert('已從字典抓取可用資料（多筆詞性與例句合併）', 'success')
       }
     } else {
       showAlert('字典查詢失敗，將嘗試翻譯單字', 'warning')
     }
 
+    // 翻譯：優先翻譯定義／例句，比翻譯單字更精準
     if(!transInp.value){
-      const translation = await fetchTranslate(w)
+      const toTranslate = exampleInp.value || defs[0] || w
+      const translation = await fetchTranslate(toTranslate)
       if(translation){
         transInp.value = translation
       } else {
