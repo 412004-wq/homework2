@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>管理單字</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="container">
+    <h2>管理單字</h2>
+    <form id="word-form">
+      <div>
+        <label>英文單字</label>
+        <input type="text" id="word" required />
+      </div>
+      <div class="form-row">
+        <div style="flex:1">
+          <label>翻譯</label>
+          <input type="text" id="translation" />
+        </div>
+        <div style="width:160px">
+          <label>詞性</label>
+          <input type="text" id="part" />
+        </div>
+      </div>
+      <div>
+        <label>例句</label>
+        <textarea id="example"></textarea>
+      </div>
+      <div>
+        <label>字根/出處</label>
+        <textarea id="etymology"></textarea>
+      </div>
+
+      <div style="margin-top:12px">
+        <button type="button" id="autofill">自動填入</button>
+        <button type="submit">儲存</button>
+        <button type="button" id="back">回到主畫面</button>
+      </div>
+    </form>
+
+    <section style="margin-top:20px">
+      <h3>現有單字清單</h3>
+      <ul id="words-list"></ul>
+    </section>
+  </main>
+
+  <script src="manage.js"></script>
+</body>
+</html>
