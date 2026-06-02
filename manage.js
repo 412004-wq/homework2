@@ -8,28 +8,78 @@ const etyInp = document.getElementById('etymology')
 const autofillBtn = document.getElementById('autofill')
 const backBtn = document.getElementById('back')
 const listEl = document.getElementById('words-list')
+const alertEl = document.getElementById('alert')
 
 function loadCards(){
   try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch(e){return[]}
 }
 function saveCards(cards){localStorage.setItem(STORAGE_KEY,JSON.stringify(cards))}
 
+function showAlert(message, type = 'info'){
+  if(!alertEl) return
+  alertEl.textContent = message
+  alertEl.className = `alert ${type}`
+}
+
 function refreshList(){
   const cards = loadCards()
   listEl.innerHTML = ''
+  if(cards.length === 0){
+    const empty = document.createElement('li')
+    empty.className = 'empty'
+    empty.textContent = '目前還沒有單字，請先儲存一筆新的背單字資料。'
+    listEl.appendChild(empty)
+    return
+  }
+
   cards.forEach((c,i)=>{
     const li = document.createElement('li')
-    li.textContent = `${c.word} — ${c.translation||''} (${c.part||''})`
+    const label = document.createElement('span')
+    label.className = 'word-label'
+    label.textContent = `${i + 1}. ${c.word} — ${c.translation || '-'} (${c.part || '-'})`
+    const deleteBtn = document.createElement('button')
+    deleteBtn.type = 'button'
+    deleteBtn.className = 'delete-btn'
+    deleteBtn.textContent = '刪除'
+    deleteBtn.dataset.index = i
+    li.appendChild(label)
+    li.appendChild(deleteBtn)
     listEl.appendChild(li)
   })
 }
 
+listEl.addEventListener('click',(event)=>{
+  const btn = event.target.closest('.delete-btn')
+  if(!btn) return
+  const index = Number(btn.dataset.index)
+  const cards = loadCards()
+  cards.splice(index,1)
+  saveCards(cards)
+  refreshList()
+  showAlert('已刪除單字', 'success')
+})
+
 form.addEventListener('submit',(e)=>{
   e.preventDefault()
+  const payload = {
+    word: wordInp.value.trim(),
+    translation: transInp.value.trim(),
+    part: partInp.value.trim(),
+    example: exampleInp.value.trim(),
+    etymology: etyInp.value.trim(),
+  }
+
+  if(!payload.word) return showAlert('請先輸入英文單字', 'warning')
+
   const cards = loadCards()
-  const payload = {word:wordInp.value.trim(),translation:transInp.value.trim(),part:partInp.value.trim(),example:exampleInp.value.trim(),etymology:etyInp.value.trim()}
-  if(!payload.word) return alert('請輸入英文單字')
-  cards.push(payload)
+  const existingIndex = cards.findIndex(c => c.word.toLowerCase() === payload.word.toLowerCase())
+  if(existingIndex >= 0){
+    cards[existingIndex] = payload
+    showAlert('已更新現有單字內容', 'success')
+  } else {
+    cards.push(payload)
+    showAlert('儲存成功', 'success')
+  }
   saveCards(cards)
   refreshList()
   form.reset()
@@ -37,44 +87,63 @@ form.addEventListener('submit',(e)=>{
 
 backBtn.addEventListener('click',()=>location.href='index.html')
 
-autofillBtn.addEventListener('click',async ()=>{
-  const w = (wordInp.value||'').trim()
-  if(!w) return alert('請先在「英文單字」輸入欄位填入單字再按自動填入')
-  autofillBtn.textContent = '填入中...'
+async function fetchTranslate(text){
   try{
-    // 1) 查字典 API（取詞性、定義、例句、出處）
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|zh-TW`
+    const resp = await fetch(url)
+    if(!resp.ok) return ''
+    const payload = await resp.json()
+    return payload?.responseData?.translatedText || ''
+  }catch(e){
+    return ''
+  }
+}
+
+async function autofillEntry(){
+  const w = (wordInp.value || '').trim()
+  if(!w){
+    showAlert('請先在英文單字欄位輸入內容', 'warning')
+    return
+  }
+
+  autofillBtn.disabled = true
+  autofillBtn.textContent = '填入中...'
+  showAlert('正在取得單字資料，請稍候...', 'info')
+
+  try{
     const dictRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`)
     if(dictRes.ok){
       const data = await dictRes.json()
-      const entry = data[0]
-      if(entry){
-        const meaning = entry.meanings && entry.meanings[0]
-        const def = meaning && meaning.definitions && meaning.definitions[0]
-        partInp.value = meaning?.partOfSpeech || ''
-        exampleInp.value = def?.example || ''
+      if(Array.isArray(data) && data.length > 0){
+        const entry = data[0]
+        const meaning = entry.meanings?.find(m => m.definitions?.length) || {}
+        const definition = meaning.definitions?.[0] || {}
+        partInp.value = meaning.partOfSpeech || ''
+        exampleInp.value = definition.example || ''
         etyInp.value = entry.origin || ''
+        showAlert('已從字典抓取可用資料', 'success')
+      }
+    } else {
+      showAlert('字典查詢失敗，將嘗試翻譯單字', 'warning')
+    }
+
+    if(!transInp.value){
+      const translation = await fetchTranslate(w)
+      if(translation){
+        transInp.value = translation
+      } else {
+        showAlert('翻譯服務暫時不可用，請手動填寫翻譯欄位', 'error')
       }
     }
+  }catch(err){
+    console.error(err)
+    showAlert('自動填入發生錯誤，請手動補齊欄位', 'error')
+  } finally {
+    autofillBtn.disabled = false
+    autofillBtn.textContent = '自動填入'
+  }
+}
 
-    // 2) 翻譯（若有定義則把定義翻成中文）
-    let toTranslate = ''
-    const cards = loadCards()
-    const exists = cards.find(c=>c.word.toLowerCase()===w.toLowerCase())
-    if(!transInp.value){
-      // 優先使用字典定義做翻譯對象
-      const possible = document.getElementById('example').value
-      toTranslate = possible || w
-      try{
-        const trRes = await fetch('https://libretranslate.de/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q:toTranslate,source:'en',target:'zh'})})
-        if(trRes.ok){
-          const tr = await trRes.json()
-          transInp.value = tr.translatedText || ''
-        }
-      }catch(e){/* 若翻譯服務不可用則略過 */}
-    }
-
-  }catch(err){console.error(err);alert('自動填入發生錯誤，請稍後再試')}
-  autofillBtn.textContent = '自動填入'
-})
+autofillBtn.addEventListener('click',autofillEntry)
 
 refreshList()

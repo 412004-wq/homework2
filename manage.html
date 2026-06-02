@@ -14,12 +14,12 @@
         <label>英文單字</label>
         <input type="text" id="word" required />
       </div>
-      <div class="form-row">
-        <div style="flex:1">
+      <div class="field-row">
+        <div>
           <label>翻譯</label>
           <input type="text" id="translation" />
         </div>
-        <div style="width:160px">
+        <div>
           <label>詞性</label>
           <input type="text" id="part" />
         </div>
@@ -33,11 +33,12 @@
         <textarea id="etymology"></textarea>
       </div>
 
-      <div style="margin-top:12px">
-        <button type="button" id="autofill">自動填入</button>
+      <div class="button-group">
+        <button type="button" id="autofill" class="primary">自動填入</button>
         <button type="submit">儲存</button>
         <button type="button" id="back">回到主畫面</button>
       </div>
+      <div id="alert" class="alert info">可輸入單字後按「自動填入」，若 API 無法回應請手動補齊欄位。</div>
     </form>
 
     <section style="margin-top:20px">
