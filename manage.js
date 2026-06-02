@@ -141,12 +141,13 @@ async function autofillEntry(){
       showAlert('字典查詢失敗，將嘗試翻譯單字', 'warning')
     }
 
-    // 翻譯：優先翻譯定義／例句，比翻譯單字更精準
+    // 翻譯：**一定優先使用單字的定義**，若無定義再使用例句；最後才翻譯單字本身
     if(!transInp.value){
-      const toTranslate = exampleInp.value || defs[0] || w
+      const toTranslate = (defs && defs.length && defs[0]) ? defs[0] : (exampleInp.value || w)
       const translation = await fetchTranslate(toTranslate)
       if(translation){
         transInp.value = translation
+        showAlert('已以單字定義取得翻譯（若有）', 'success')
       } else {
         showAlert('翻譯服務暫時不可用，請手動填寫翻譯欄位', 'error')
       }
