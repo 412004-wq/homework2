@@ -4,46 +4,65 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>管理單字</title>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'oil-sky': '#8ab5f6',
+            'oil-amber': '#f6c77c',
+            'oil-rose': '#f2a8c9',
+            'oil-butter': '#fff1c8',
+            'oil-slate': '#203154',
+            'oil-olive': '#7c8f58'
+          },
+          boxShadow: {
+            oil: '0 28px 60px rgba(32,49,84,0.18)'
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-  <main class="container">
-    <h2>管理單字</h2>
-    <form id="word-form">
-      <div>
-        <label>英文單字</label>
-        <input type="text" id="word" required />
+<body class="min-h-screen bg-gradient-to-br from-oil-rose/40 via-oil-butter to-oil-sky text-slate-900">
+  <main class="mx-auto max-w-5xl px-6 py-10">
+    <h2 class="mb-6 text-3xl font-extrabold tracking-tight text-oil-slate">管理單字</h2>
+    <form id="word-form" class="grid gap-6 rounded-[2rem] border border-oil-slate/10 bg-white/90 p-8 shadow-oil backdrop-blur-xl">
+      <div class="grid gap-2">
+        <label class="text-sm font-semibold text-slate-800">英文單字</label>
+        <input type="text" id="word" required class="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-oil-sky focus:outline-none focus:ring-2 focus:ring-oil-sky/30" />
       </div>
-      <div class="field-row">
-        <div>
-          <label>翻譯</label>
-          <input type="text" id="translation" />
+      <div class="grid gap-4 sm:grid-cols-[1fr_160px]">
+        <div class="grid gap-2">
+          <label class="text-sm font-semibold text-slate-800">翻譯</label>
+          <input type="text" id="translation" class="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-oil-sky focus:outline-none focus:ring-2 focus:ring-oil-sky/30" />
         </div>
-        <div>
-          <label>詞性</label>
-          <input type="text" id="part" />
+        <div class="grid gap-2">
+          <label class="text-sm font-semibold text-slate-800">詞性</label>
+          <input type="text" id="part" class="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-oil-sky focus:outline-none focus:ring-2 focus:ring-oil-sky/30" />
         </div>
       </div>
-      <div>
-        <label>例句</label>
-        <textarea id="example"></textarea>
+      <div class="grid gap-2">
+        <label class="text-sm font-semibold text-slate-800">例句</label>
+        <textarea id="example" class="min-h-[100px] rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-oil-sky focus:outline-none focus:ring-2 focus:ring-oil-sky/30"></textarea>
       </div>
-      <div>
-        <label>字根/出處</label>
-        <textarea id="etymology"></textarea>
+      <div class="grid gap-2">
+        <label class="text-sm font-semibold text-slate-800">字根/出處</label>
+        <textarea id="etymology" class="min-h-[100px] rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-oil-sky focus:outline-none focus:ring-2 focus:ring-oil-sky/30"></textarea>
       </div>
-
-      <div class="button-group">
-        <button type="button" id="autofill" class="primary">自動填入</button>
-        <button type="submit">儲存</button>
-        <button type="button" id="back">回到主畫面</button>
+      <div class="flex flex-wrap gap-4">
+        <button type="button" id="autofill" class="rounded-2xl bg-oil-slate px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-oil/10 transition hover:bg-oil-slate/90">自動填入</button>
+        <button type="submit" class="rounded-2xl bg-oil-amber px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-oil/10 transition hover:bg-oil-amber/90">儲存</button>
+        <button type="button" id="back" class="rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5">回到主畫面</button>
       </div>
-      <div id="alert" class="alert info">可輸入單字後按「自動填入」，若 API 無法回應請手動補齊欄位。</div>
+      <div id="alert" class="rounded-2xl px-4 py-3 text-sm text-oil-slate">可輸入單字後按「自動填入」，若 API 無法回應請手動補齊欄位。</div>
     </form>
 
-    <section style="margin-top:20px">
-      <h3>現有單字清單</h3>
-      <ul id="words-list"></ul>
+    <section class="mt-10">
+      <h3 class="mb-4 text-2xl font-bold text-oil-slate">現有單字清單</h3>
+      <ul id="words-list" class="space-y-3"></ul>
     </section>
   </main>
 

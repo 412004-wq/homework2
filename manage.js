@@ -1,4 +1,6 @@
 const STORAGE_KEY = 'vocab_cards_v1'
+const BACKEND_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec'
+const AUTH_USERS = [{user:'admin', pass:'wordpass123'}]
 const form = document.getElementById('word-form')
 const wordInp = document.getElementById('word')
 const transInp = document.getElementById('translation')
@@ -10,15 +12,49 @@ const backBtn = document.getElementById('back')
 const listEl = document.getElementById('words-list')
 const alertEl = document.getElementById('alert')
 
+function requireLogin(){
+  const logged = sessionStorage.getItem('vocabManagerAuth')
+  if(logged === 'logged-in') return
+
+  const username = prompt('請輸入管理者帳號：')
+  const password = prompt('請輸入管理者密碼：')
+  if(!username || !password){
+    alert('需通過管理者驗證才能進入管理頁面。')
+    location.href = 'index.html'
+    return
+  }
+
+  const valid = AUTH_USERS.some(item => item.user === username && item.pass === password)
+  if(!valid){
+    alert('帳號或密碼錯誤，將返回主畫面。')
+    location.href = 'index.html'
+    return
+  }
+
+  sessionStorage.setItem('vocabManagerAuth', 'logged-in')
+  showAlert('已通過管理者驗證', 'success')
+}
+
 function loadCards(){
   try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch(e){return[]}
 }
+
 function saveCards(cards){localStorage.setItem(STORAGE_KEY,JSON.stringify(cards))}
 
 function showAlert(message, type = 'info'){
   if(!alertEl) return
+
+  const base = ['rounded-2xl','px-4','py-3','text-sm','shadow-sm','transition','duration-200']
+  const styleMap = {
+    info: ['bg-oil-sky/20','border','border-oil-sky/40','text-oil-slate'],
+    success: ['bg-emerald-100','border','border-emerald-200','text-emerald-900'],
+    warning: ['bg-amber-100','border','border-amber-200','text-amber-900'],
+    error: ['bg-rose-100','border','border-rose-200','text-rose-900']
+  }
+
   alertEl.textContent = message
-  alertEl.className = `alert ${type}`
+  alertEl.className = ''
+  alertEl.classList.add(...base, ...styleMap[type] || styleMap.info)
 }
 
 function refreshList(){
@@ -26,7 +62,7 @@ function refreshList(){
   listEl.innerHTML = ''
   if(cards.length === 0){
     const empty = document.createElement('li')
-    empty.className = 'empty'
+    empty.className = 'rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500'
     empty.textContent = '目前還沒有單字，請先儲存一筆新的背單字資料。'
     listEl.appendChild(empty)
     return
@@ -34,12 +70,13 @@ function refreshList(){
 
   cards.forEach((c,i)=>{
     const li = document.createElement('li')
+    li.className = 'flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm'
     const label = document.createElement('span')
-    label.className = 'word-label'
+    label.className = 'text-sm font-semibold text-slate-900'
     label.textContent = `${i + 1}. ${c.word} — ${c.translation || '-'} (${c.part || '-'})`
     const deleteBtn = document.createElement('button')
     deleteBtn.type = 'button'
-    deleteBtn.className = 'delete-btn'
+    deleteBtn.className = 'rounded-2xl bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-200'
     deleteBtn.textContent = '刪除'
     deleteBtn.dataset.index = i
     li.appendChild(label)
@@ -49,8 +86,8 @@ function refreshList(){
 }
 
 listEl.addEventListener('click',(event)=>{
-  const btn = event.target.closest('.delete-btn')
-  if(!btn) return
+  const btn = event.target.closest('button')
+  if(!btn || !btn.dataset.index) return
   const index = Number(btn.dataset.index)
   const cards = loadCards()
   cards.splice(index,1)
@@ -59,7 +96,7 @@ listEl.addEventListener('click',(event)=>{
   showAlert('已刪除單字', 'success')
 })
 
-form.addEventListener('submit',(e)=>{
+form.addEventListener('submit',async (e)=>{
   e.preventDefault()
   const payload = {
     word: wordInp.value.trim(),
@@ -80,12 +117,39 @@ form.addEventListener('submit',(e)=>{
     cards.push(payload)
     showAlert('儲存成功', 'success')
   }
+
   saveCards(cards)
   refreshList()
   form.reset()
+
+  try{
+    await sendToBackend(payload)
+    showAlert('已同步儲存至後端試算表', 'success')
+  }catch(err){
+    console.warn(err)
+    showAlert('本地儲存成功，後端同步失敗', 'warning')
+  }
 })
 
 backBtn.addEventListener('click',()=>location.href='index.html')
+
+async function sendToBackend(payload){
+  if(!BACKEND_URL || BACKEND_URL.includes('YOUR_SCRIPT_ID')){
+    return
+  }
+
+  const response = await fetch(BACKEND_URL, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  })
+
+  if(!response.ok){
+    throw new Error('後端儲存失敗')
+  }
+
+  return response.json()
+}
 
 async function fetchTranslate(text){
   try{
@@ -117,11 +181,9 @@ async function autofillEntry(){
       const data = await dictRes.json()
       if(Array.isArray(data) && data.length > 0){
         const entry = data[0]
-        // 收集所有詞性
         const parts = Array.from(new Set((entry.meanings||[]).map(m=>m.partOfSpeech).filter(Boolean)))
         if(parts.length) partInp.value = parts.join(', ')
 
-        // 收集例句與定義，若有多個以 / 分隔
         const examples = []
         defs = []
         for(const m of (entry.meanings||[])){
@@ -133,7 +195,6 @@ async function autofillEntry(){
         if(examples.length) exampleInp.value = examples.slice(0,3).join(' / ')
         else if(defs.length) exampleInp.value = defs[0]
 
-        // 字根/出處
         etyInp.value = entry.origin || ''
         showAlert('已從字典抓取可用資料（多筆詞性與例句合併）', 'success')
       }
@@ -141,7 +202,6 @@ async function autofillEntry(){
       showAlert('字典查詢失敗，將嘗試翻譯單字', 'warning')
     }
 
-    // 翻譯：**一定優先使用單字的定義**，若無定義再使用例句；最後才翻譯單字本身
     if(!transInp.value){
       const toTranslate = (defs && defs.length && defs[0]) ? defs[0] : (exampleInp.value || w)
       const translation = await fetchTranslate(toTranslate)
@@ -163,4 +223,5 @@ async function autofillEntry(){
 
 autofillBtn.addEventListener('click',autofillEntry)
 
+requireLogin()
 refreshList()
