@@ -1,102 +1,157 @@
-# Google 試算表 + Google Apps Script 後端整合說明
+# 最簡單的 Google Sheets 後端整合（零過度工程）
 
-此文件記錄如何將 `manage.html` 後端儲存功能串接到 Google 試算表，並補充三種管理頁身分認證方式。
+## 第一步：建立 Google 試算表
 
-## 1. 建立 Google 試算表
+1. 開啟 https://sheets.google.com，建立新試算表
+2. 第一列輸入欄位名稱：`Word` `Translation` `PartOfSpeech` `Example` `Etymology` `CreatedAt`
+3. 複製試算表網址中的 ID（`https://docs.google.com/spreadsheets/d/` 後面這段）
 
-1. 開啟 Google 試算表，建立新試算表。
-2. 在第一列填入欄位名稱：
-   - `Word`
-   - `Translation`
-   - `PartOfSpeech`
-   - `Example`
-   - `Etymology`
-   - `CreatedAt`
-3. 記下此試算表網址，以備後續參考。
+例如：`https://docs.google.com/spreadsheets/d/1a2b3c4d5e6f/edit` → ID 是 `1a2b3c4d5e6f`
 
-## 2. 建立 Google Apps Script
+## 第二步：建立 Google Apps Script
 
-1. 點選 `擴充功能` > `Apps Script`，或直接進入 https://script.google.com/。
-2. 建立新專案，將下列範例程式碼貼入 `Code.gs`：
+1. 在試算表上，點選 `擴充功能` → `Apps Script`
+2. 清空預設代碼，複製貼入以下代碼：
 
 ```javascript
 function doPost(e) {
-  try {
-    const body = JSON.parse(e.postData.contents)
-    const sheetId = 'YOUR_SHEET_ID'
-    const ss = SpreadsheetApp.openById(sheetId)
-    const sheet = ss.getSheets()[0]
-
-    const row = [
-      body.word || '',
-      body.translation || '',
-      body.part || '',
-      body.example || '',
-      body.etymology || '',
-      new Date()
-    ]
-
-    sheet.appendRow(row)
-
-    return ContentService
-      .createTextOutput(JSON.stringify({status: 'ok'}))
-      .setMimeType(ContentService.MimeType.JSON)
-  } catch (error) {
-    return ContentService
-      .createTextOutput(JSON.stringify({status: 'error', message: error.message}))
-      .setMimeType(ContentService.MimeType.JSON)
-  }
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const data = JSON.parse(e.postData.contents);
+  
+  sheet.appendRow([
+    data.word || '',
+    data.translation || '',
+    data.part || '',
+    data.example || '',
+    data.etymology || '',
+    new Date()
+  ]);
+  
+  return ContentService.createTextOutput(JSON.stringify({ok: true}))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 ```
 
-3. 將 `YOUR_SHEET_ID` 換成實際的試算表 ID（網址中 `https://docs.google.com/spreadsheets/d/THIS_ID/edit`）。
+3. **保存** (Ctrl+S)
 
-## 3. 部署成 Web App
+## 第三步：部署為 Web App
 
-1. 在 Apps Script 編輯器中，點選 `部署` > `新建部署`。
-2. 選擇類型 `Web 應用程式`。
+1. 點選左上角 `部署` → `新建部署`
+2. 選擇類型：`Web 應用程式`
 3. 設定：
-   - `描述`: `背單字管理後端`
-   - `執行應用程式的使用者`: `我自己`
-   - `誰有權存取`: `任何人` 或 `任何人（包括匿名使用者）`
-4. 部署後，取得提供的 Web 應用程式 URL。
+   - **執行應用程式的身分**：選你的 Google 帳號
+   - **誰有權存取**：選 `任何人`
+4. 點 `部署`，複製 **Web App URL**（長得像 `https://script.google.com/macros/s/xxxxx/exec`）
 
-## 4. 前端設定
+## 第四步：前端設定
 
-1. 打開 `manage.js`，找到 `BACKEND_URL` 常數。
-2. 將 `https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec` 修改成你的實際 Web App URL。
-3. 儲存後，當管理者點擊「儲存」時，頁面將會：
-   - 先把單字資料存到 localStorage
-   - 再呼叫後端 API 將資料送到 Google 試算表
+打開 `manage.js`，找到第 2 行：
 
-## 5. 身分認證方法
+```javascript
+const BACKEND_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec'
+```
 
-### 方法一：JS 驗證帳號密碼
+改成你複製的 Web App URL，例如：
 
-目前 `manage.js` 透過 `prompt()` 方式做簡易驗證：
-- `AUTH_USERS` 陣列內有硬 coded 帳號密碼
-- 若驗證成功，會將狀態存入 `sessionStorage`
-- 若驗證失敗，會導回 `index.html`
+```javascript
+const BACKEND_URL = 'https://script.google.com/macros/s/1a2b3c4d5e6f7g8h9i0j/exec'
+```
 
-此方式適用於純前端快速驗證，但帳號密碼仍會被使用者端讀到，不適合保護高敏感資料。
+**完成！** 現在按「儲存」按鈕時，資料會自動傳到 Google Sheets。
 
-### 方法二：Google 試算表存帳號密碼
+---
 
-流程：
-1. 在 Google 試算表新增一張 `Accounts` 試算表，包含 `username`、`passwordHash` 等欄位。
-2. 在 Google Apps Script 中建立驗證 API，例如 `doGet` 或 `doPost` 檢查帳號密碼。
-3. 前端在進入管理頁時，先呼叫該驗證 API，後端比對資料後回傳是否允許。
-4. 若驗證通過，前端再顯示管理資訊。
+## 驗證方式（可選）
 
-這種做法較安全，但仍需注意密碼儲存方式應該使用雜湊，而不是明碼。
+### 簡單做法：hardcode 帳號密碼
+在 `manage.js` 第 3 行已定義：
+```javascript
+const AUTH_USERS = [{user:'admin', pass:'wordpass123'}]
+```
 
-### 方法三：OAuth 驗證電子郵件
+進管理頁時會用 `prompt()` 要求輸入帳號密碼，驗證成功才能使用。
 
-此方式需要使用 Google OAuth 或 Google Identity Services：
-1. 在 Google 雲端平台建立 OAuth 用戶端 ID。
-2. 在前端整合 Google Identity API，要求使用者登入 Google 帳號。
-3. 取得登入後的電子郵件資訊。
-4. 你的後端或前端可以檢查電子郵件是否在允許名單中。
+### 更安全做法：在 Google Sheets 存帳號密碼
+
+1. 試算表新增第二張工作表，改名為 `Accounts`
+2. 第一列輸入：`username` `password`
+3. 新增一行：`admin` `wordpass123`
+4. Code.gs 改成：
+
+```javascript
+function doPost(e) {
+  const path = e.parameter.action;
+  
+  if (path === 'auth') {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const accountSheet = ss.getSheetByName('Accounts');
+    const data = accountSheet.getDataRange().getValues();
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === e.parameter.user && data[i][1] === e.parameter.pass) {
+        return ContentService.createTextOutput(JSON.stringify({ok: true}))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify({ok: false}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const data = JSON.parse(e.postData.contents);
+  sheet.appendRow([
+    data.word || '',
+    data.translation || '',
+    data.part || '',
+    data.example || '',
+    data.etymology || '',
+    new Date()
+  ]);
+  
+  return ContentService.createTextOutput(JSON.stringify({ok: true}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+```
+
+5. manage.js 中 `requireLogin` 改成：
+
+```javascript
+async function requireLogin() {
+  const logged = sessionStorage.getItem('vocabManagerAuth');
+  if (logged === 'logged-in') return;
+  
+  const username = prompt('帳號：');
+  const password = prompt('密碼：');
+  if (!username || !password) {
+    location.href = 'index.html';
+    return;
+  }
+  
+  const res = await fetch(`${BACKEND_URL}?action=auth&user=${username}&pass=${password}`);
+  const result = await res.json();
+  
+  if (!result.ok) {
+    alert('帳號或密碼錯誤');
+    location.href = 'index.html';
+    return;
+  }
+  
+  sessionStorage.setItem('vocabManagerAuth', 'logged-in');
+}
+```
+
+---
+
+## 常見問題
+
+**Q: 部署後改 Code.gs，需要再部署一次嗎？**  
+A: 不用。只要 GAS 編輯器按保存，Web App 會自動更新。
+
+**Q: 如果 Web App URL 忘記了？**  
+A: 在 Apps Script 編輯器，左側找 `部署`，點一次既有部署就能看到 URL。
+
+**Q: 資料會不會傳不到 Sheets？**  
+A: manage.js 的 `sendToBackend` 有 try-catch，若失敗會顯示警告。本地 localStorage 還是會保存，不怕遺失。
 
 這是最安全的方式，適合需要真實管理者身份驗證的應用場景。
 
